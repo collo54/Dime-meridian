@@ -1,3 +1,4 @@
+import 'package:dime_meridian/custom/auth_state.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform, PlatformDispatcher;
@@ -115,7 +116,7 @@ class MyApp extends ConsumerWidget {
       theme: oneChatTheme,
       darkTheme: oneChatDarkTheme,
       themeMode: ThemeMode.system,
-      home: Placeholder(),
+      home: AuthState(),
     );
   }
 }

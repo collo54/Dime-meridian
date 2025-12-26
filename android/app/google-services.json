@@ -12,7 +12,20 @@
           "package_name": "com.dimemeridian.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "222936818676-t8s1rnl7l5ofpgmv4usms9jas7cko37e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dimemeridian.app",
+            "certificate_hash": "33bb7cd3b12624d0acd8bc415eb6488c3c910295"
+          }
+        },
+        {
+          "client_id": "222936818676-4ace0f7ikqehfgfmcj43rbl9r8lbil4n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC8RtSCVWm-V2tcexOZrTA65jVn7h3Ua1M"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "222936818676-4ace0f7ikqehfgfmcj43rbl9r8lbil4n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
