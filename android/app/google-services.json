@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "222936818676",
+    "project_id": "dime-meridian",
+    "storage_bucket": "dime-meridian.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:222936818676:android:5338bbda8083d1c4ea8fa1",
+        "android_client_info": {
+          "package_name": "com.dimemeridian.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8RtSCVWm-V2tcexOZrTA65jVn7h3Ua1M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

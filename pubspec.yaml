@@ -1,0 +1,102 @@
+name: dime_meridian
+description: "Dime meridian"
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_native_splash: ^2.4.6
+  flutter_riverpod: ^2.6.1
+  firebase_core: ^3.13.0
+  cloud_firestore: ^5.6.7
+  intl: ^0.20.2
+  uuid: ^4.5.1
+  purchases_flutter: ^8.8.1
+  purchases_ui_flutter: ^8.8.1
+  fluttertoast: ^8.2.12
+  webview_flutter: ^4.13.0
+  google_fonts: ^6.2.1
+  url_launcher: ^6.3.1
+  share_plus: ^11.0.0
+  in_app_update: ^4.2.3
+  firebase_messaging: ^15.2.7
+  firebase_crashlytics: ^4.3.6
+  firebase_analytics: ^11.4.6
+  firebase_auth: ^5.1.4
+  google_sign_in: ^6.2.1
+  hugeicons: ^0.0.7  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  change_app_package_name: ^1.5.0  
+  flutter_launcher_icons: "^0.14.3"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/images/logo2.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  web:
+    generate: true
+    image_path: "assets/images/logo2.png"
+    background_color: "#0B1E2E"
+    theme_color: "#0B1E2E"  
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+flutter_native_splash:
+  # The color to fill the background of the splash screen.
+  # Required.
+  color: "#0B1E2E" # Or your desired background color
+  color_dark: "#0B1E2E"
+
+  # The image asset to be used as the splash screen image.
+  # Required.
+  image: assets/images/transparent_logo1.png
+
+  # To position the image in the center of the screen.
+  # Optional.
+  # Valid values: "top", "bottom", "center", "left", "right", "topLeft",
+  # "topRight", "bottomLeft", "bottomRight". Default is "center".
+  # gravity: center
+
+  # To fill the entire screen with the image, uncomment the following:
+  # (This might stretch your image if its aspect ratio doesn't match the screen)
+  # For a true full image splash, you might want to provide different images
+  # for different aspect ratios or use a background color with a centered logo.
+ # android_gravity: fill
+  # ios_content_mode: scaleAspectFill
+
+  # If you want to show the image full screen (อาจมีการ crop)
+  # This is often what people mean by "full image splash"
+  fullscreen: true
+
+  # For Android 12+ devices, you can specify a separate image:
+  android_12:
+    image: assets/images/transparent_logo1.png
+    color: "#0B1E2E"
+    icon_background_color: "#0B1E2E" # Color for the circle behind the icon (if image isn't full screen)
+    image_dark: assets/images/transparent_logo1.png
+    color_dark: "#0B1E2E"
+    icon_background_color_dark: "#0B1E2E"
+
+  # Branding allows you to display a small image below the splash image.
+  # branding: assets/images/branding.png
+  # branding_mode: bottom # Or 'bottomRight', 'bottomLeft'  
+
+flutter:
+  uses-material-design: true
+  assets:
+   - assets/images/logo1.png
+   - assets/images/logo2.png
+   - assets/images/transparent_logo1.png
+   - assets/images/transparent_logo2.png
