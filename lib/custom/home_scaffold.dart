@@ -116,6 +116,28 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
             ),
           ),
         ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: kdarkblue,
+          foregroundColor: kwhite25525525510,
+          onPressed: () async {
+            // currentScaffold.currentState!.showBodyScrim(true, 0.5);
+
+            // showBottomSheet(
+            //   context: context,
+            //   builder: (BuildContext context) {
+            //     return CreateTweetBottomsheet(
+            //       model: user,
+            //     );
+            //   },
+            // );
+            // currentScaffold.currentState!.showBodyScrim(false, 0.5);
+          },
+          child: const HugeIcon(
+            icon: HugeIcons.strokeRoundedChatBot,
+            color: kwhite25525525510,
+            size: 24.0,
+          ),
+        ),
       ),
     );
   }

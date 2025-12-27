@@ -59,7 +59,7 @@ flutter_launcher_icons:
 flutter_native_splash:
   # The color to fill the background of the splash screen.
   # Required.
-  color: "#0B1E2E" # Or your desired background color
+  color: "#FFFFFF" # Or your desired background color
   color_dark: "#0B1E2E"
 
   # The image asset to be used as the splash screen image.
@@ -86,8 +86,8 @@ flutter_native_splash:
   # For Android 12+ devices, you can specify a separate image:
   android_12:
     image: assets/images/transparent_logo1.png
-    color: "#0B1E2E"
-    icon_background_color: "#0B1E2E" # Color for the circle behind the icon (if image isn't full screen)
+    color: "#FFFFFF"
+    icon_background_color: "#FFFFFF" # Color for the circle behind the icon (if image isn't full screen)
     image_dark: assets/images/transparent_logo1.png
     color_dark: "#0B1E2E"
     icon_background_color_dark: "#0B1E2E"

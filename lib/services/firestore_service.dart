@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/revenue_cat_event_model.dart';
 import '../models/user_profile_model.dart';
+import '../providers/providers.dart';
 import 'document_path.dart';
 
 class FirestoreService {
@@ -179,6 +180,45 @@ class FirestoreService {
             debugPrint("Docs found: ${snapshot.docs.length}");
             return RevenueCatEventModel.fromMap(doc.data());
           }).toList(),
+        );
+  }
+
+  /// Reads a stream of events filtered by Type and Date Range
+  Stream<List<RevenueCatEventModel>> revenuecatFilteredEventsStream({
+    required String eventType,
+    required TimeRange timeRange,
+  }) {
+    Query query = FirebaseFirestore.instance
+        .collection('RevenuecatEvents')
+        .where('type', isEqualTo: eventType)
+        .orderBy('eventTimestamp', descending: false);
+
+    // Apply Date Filtering
+    DateTime now = DateTime.now();
+    if (timeRange == TimeRange.days7) {
+      DateTime start = now.subtract(const Duration(days: 7));
+      query = query.where('eventTimestamp', isGreaterThanOrEqualTo: start);
+    } else if (timeRange == TimeRange.days30) {
+      DateTime start = now.subtract(const Duration(days: 30));
+      query = query.where('eventTimestamp', isGreaterThanOrEqualTo: start);
+    }
+    // For 'allTime', we don't add a date filter, but you might want a higher limit
+
+    // Safety limit to prevent reading 10k docs in one go
+    // For "All Time" you might want to increase this or implement pagination logic
+    int limit = timeRange == TimeRange.allTime ? 500 : 100;
+
+    return query
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => RevenueCatEventModel.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                ),
+              )
+              .toList(),
         );
   }
 }

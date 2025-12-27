@@ -44,3 +44,15 @@ final cloudFirestoreServiceProvider = Provider((ref) {
 final eventTypeFilterProvider = StateProvider<String>(
   (ref) => 'INITIAL_PURCHASE',
 );
+
+// Tracks the selected event type for the filtered chart
+final eventTypeFilterProviderChartOne = StateProvider<String>(
+  (ref) => 'INITIAL_PURCHASE',
+);
+
+enum TimeRange { days7, days30, allTime }
+
+// Filter for Time Range (New)
+final timeRangeFilterProvider = StateProvider<TimeRange>(
+  (ref) => TimeRange.days30,
+);
