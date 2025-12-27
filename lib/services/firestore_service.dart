@@ -160,4 +160,25 @@ class FirestoreService {
         .map((doc) => RevenueCatEventModel.fromMap(doc.data()))
         .toList();
   }
+
+  /// Reads a stream of RevenueCat events, ordered by date
+  Stream<List<RevenueCatEventModel>> revenuecatRenenwalEventsStream(
+    String eventType,
+  ) {
+    // Note: You might need to create a composite index in Firestore
+    // if you add .where() clauses later.
+    return FirebaseFirestore.instance
+        .collection('RevenuecatEvents')
+        .where('type', isEqualTo: eventType)
+        .orderBy('eventTimestamp', descending: false) // Oldest first for charts
+        .limit(100) // Optimization: Limit to recent 100 events for graph
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs.map((doc) {
+            debugPrint("Querying for type: $eventType");
+            debugPrint("Docs found: ${snapshot.docs.length}");
+            return RevenueCatEventModel.fromMap(doc.data());
+          }).toList(),
+        );
+  }
 }

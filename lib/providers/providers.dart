@@ -39,3 +39,8 @@ final cloudFirestoreServiceProvider = Provider((ref) {
   UserModel? usermodel = ref.watch(userModelProvider);
   return FirestoreService(uid: usermodel!.uid);
 });
+
+// Tracks the selected event type for the filtered chart
+final eventTypeFilterProvider = StateProvider<String>(
+  (ref) => 'INITIAL_PURCHASE',
+);
