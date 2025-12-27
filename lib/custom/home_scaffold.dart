@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dime_meridian/pages/revenue_dashboard.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,7 +50,7 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
         // backgroundColor: kblack00005,
         body: const TabBarView(
           physics: NeverScrollableScrollPhysics(),
-          children: [Placeholder(), Placeholder(), Placeholder()],
+          children: [RevenueDashboard(), Placeholder(), Placeholder()],
         ),
         extendBody: false,
         resizeToAvoidBottomInset: false,

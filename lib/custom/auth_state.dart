@@ -30,8 +30,8 @@ class AuthState extends ConsumerWidget {
             height: 150,
             child: Image.asset(
               brightness == Brightness.light
-                  ? 'assets/images/logo13.jpg'
-                  : 'assets/images/logo12.jpg',
+                  ? 'assets/images/transparent_logo1.jpg'
+                  : 'assets/images/logo1.jpg',
               fit: BoxFit.cover,
             ),
           ),

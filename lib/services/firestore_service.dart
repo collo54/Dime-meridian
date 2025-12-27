@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../models/revenue_cat_event_model.dart';
 import '../models/user_profile_model.dart';
 import 'document_path.dart';
 
@@ -127,5 +128,36 @@ class FirestoreService {
       debugPrint('delete: $path');
     }
     await reference.delete();
+  }
+
+  // Add this method to your existing FirestoreService class
+
+  /// Reads a stream of RevenueCat events, ordered by date
+  Stream<List<RevenueCatEventModel>> revenueEventsStream() {
+    // Note: You might need to create a composite index in Firestore
+    // if you add .where() clauses later.
+    return FirebaseFirestore.instance
+        .collection('RevenuecatEvents')
+        .orderBy('eventTimestamp', descending: false) // Oldest first for charts
+        .limit(100) // Optimization: Limit to recent 100 events for graph
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => RevenueCatEventModel.fromMap(doc.data()))
+              .toList(),
+        );
+  }
+
+  // Alternative: Fetch Future (if you don't need real-time updates)
+  Future<List<RevenueCatEventModel>> getRevenueEvents() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('RevenuecatEvents')
+        .orderBy('eventTimestamp', descending: false)
+        .limit(100)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => RevenueCatEventModel.fromMap(doc.data()))
+        .toList();
   }
 }

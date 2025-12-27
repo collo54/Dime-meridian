@@ -370,9 +370,8 @@ class _LoginMobileLayoutState extends ConsumerState<LoginMobileLayout> {
                           style: GoogleFonts.inter(
                             textStyle: TextStyle(
                               height: 1.56,
-                              color: brightness == Brightness.light
-                                  ? kdarkblue
-                                  : kwhite25525525510, // Color.fromRGBO(255, 230, 2, 1),
+                              color:
+                                  kwhite25525525510, // Color.fromRGBO(255, 230, 2, 1),
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

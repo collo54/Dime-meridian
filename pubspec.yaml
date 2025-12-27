@@ -32,7 +32,8 @@ dependencies:
   google_sign_in: ^6.2.1
   hugeicons: ^0.0.7
   shared_preferences: ^2.3.3  
-  permission_handler: ^12.0.1  
+  permission_handler: ^12.0.1
+  fl_chart: ^1.0.0  
 
 dev_dependencies:
   flutter_test:
@@ -103,3 +104,6 @@ flutter:
    - assets/images/transparent_logo1.png
    - assets/images/transparent_logo2.png
    - assets/images/googleicon.png
+
+dependency_overrides:
+  vector_math: 2.2.0   
