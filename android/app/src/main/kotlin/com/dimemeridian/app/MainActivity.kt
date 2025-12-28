@@ -1,5 +1,6 @@
 package com.dimemeridian.app
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity // Import this
 
-class MainActivity : FlutterActivity()
+class MainActivity: FlutterFragmentActivity() { 
+}

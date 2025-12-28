@@ -19,7 +19,9 @@ class LoginPage extends ConsumerWidget {
         width: size.width,
         height: size.height,
         child: Center(
-          child: LoginMobileLayout(currentScaffold: currentScaffold),
+          child: LoginMobileLayout(
+            //currentScaffold: currentScaffold
+          ),
         ),
       ),
     );

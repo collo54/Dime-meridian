@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../custom/auth_state.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
@@ -30,6 +32,10 @@ final scaffoldScrimProvider = Provider((ref) {
 
 /// creates a provider for AuthService class
 final authenticate = Provider((ref) => AuthService());
+// final authenticate = Provider<AuthService>((ref) {
+//   ref.keepAlive();
+//   return AuthService();
+// });
 
 /// creates a provider for permission handler class
 final permissionServiceProvider = Provider((ref) => PermissionService());
@@ -56,3 +62,17 @@ enum TimeRange { days7, days30, allTime }
 final timeRangeFilterProvider = StateProvider<TimeRange>(
   (ref) => TimeRange.days30,
 );
+
+// final goRouterProvider = Provider<GoRouter>((ref) {
+//   final myUserModel = ref.watch(userModelProvider);
+
+//   return GoRouter(
+//     routes: [
+//       GoRoute(
+//         path: '/',
+//         builder: (context, state) => const AuthState(),
+//         routes: [],
+//       ),
+//     ],
+//   );
+// });

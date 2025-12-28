@@ -5,11 +5,8 @@ import 'package:flutter/foundation.dart'
 import 'package:firebase_core/firebase_core.dart';
 //import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 //import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dime_meridian/services/app_update_service.dart';
 //import 'package:myapp/services/notifications_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'firebase_options.dart';
@@ -18,38 +15,11 @@ import 'themes/dark_theme.dart';
 import 'themes/light_theme.dart';
 
 void main() async {
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  //WidgetsBinding widgetsBinding =
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // FirebaseMessaging.instance.subscribeToTopic("all_users");
-  // await FirebaseMessaging.instance.requestPermission(
-  //   alert: true,
-  //   announcement: false,
-  //   badge: true,
-  //   carPlay: false,
-  //   criticalAlert: false,
-  //   provisional: false,
-  //   sound: true,
-  // );
-  // const AndroidInitializationSettings initializationSettingsAndroid =
-  //     AndroidInitializationSettings('@mipmap/ic_launcher');
+  //FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  // final InitializationSettings initializationSettings = InitializationSettings(
-  //   android: initializationSettingsAndroid,
-  // );
-
-  // Set the navigation bar color
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      systemNavigationBarColor: Color.fromARGB(
-        255,
-        32,
-        12,
-        104,
-      ), // Replace with your desired color
-      systemNavigationBarIconBrightness: Brightness.light, // Icon brightness
-    ),
-  );
   //FirebaseFirestore.setLoggingEnabled(true);
   FlutterError.onError = (errorDetails) {
     FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
@@ -60,21 +30,10 @@ void main() async {
     return true;
   };
   await _configureSDK();
+
+  //AppUpdateService.checkForUpdate();
+  // FlutterNativeSplash.remove();
   runApp(const ProviderScope(child: MyApp()));
-  AppUpdateService.checkForUpdate();
-  FlutterNativeSplash.remove();
-  // final notificationservice = NotificationsService();
-  // await notificationservice.flutterLocalNotificationsPlugin.initialize(
-  //   initializationSettings,
-  // );
-  // FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-  //   if (message.notification != null) {
-  //     notificationservice.showLocalNotification(
-  //       message.notification!.title,
-  //       message.notification!.body,
-  //     );
-  //   }
-  // });
 }
 
 Future<void> _configureSDK() async {

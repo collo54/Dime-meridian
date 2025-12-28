@@ -66,4 +66,5 @@ class DefaultFirebaseOptions {
     projectId: 'dime-meridian',
     storageBucket: 'dime-meridian.firebasestorage.app',
   );
+
 }

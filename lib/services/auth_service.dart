@@ -30,9 +30,9 @@ abstract class AuthBase {
 class AuthService implements AuthBase {
   final _firebaseAuth = FirebaseAuth.instance;
   static const String clientId =
-      '277148492477-9i3j2ad2dcanb6vpdgdjb2j1ka4ffbnv.apps.googleusercontent.com';
+      '222936818676-t8s1rnl7l5ofpgmv4usms9jas7cko37e.apps.googleusercontent.com';
   static const String webClientId =
-      '277148492477-ib2ec00i1odpca97krg2uh9c0fhvtgb8.apps.googleusercontent.com';
+      '222936818676-4ace0f7ikqehfgfmcj43rbl9r8lbil4n.apps.googleusercontent.com';
 
   String getUserString(String inputString) {
     String firstFiveChars = inputString.substring(
@@ -58,7 +58,8 @@ class AuthService implements AuthBase {
 
   @override
   Stream<UserModel?> get onAuthStateChanged {
-    return _firebaseAuth.idTokenChanges().map(_userFromFirebase);
+    return _firebaseAuth.authStateChanges().map(_userFromFirebase);
+    // return _firebaseAuth.idTokenChanges().map(_userFromFirebase);
   }
 
   @override

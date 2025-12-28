@@ -8,6 +8,7 @@ import 'package:hugeicons/hugeicons.dart';
 
 import '../constants/colors.dart';
 
+import '../pages/user_settings_page.dart';
 import '../providers/providers.dart';
 
 class HomeScaffold extends ConsumerStatefulWidget {
@@ -48,9 +49,9 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
       initialIndex: currentTab,
       child: Scaffold(
         // backgroundColor: kblack00005,
-        body: const TabBarView(
+        body: TabBarView(
           physics: NeverScrollableScrollPhysics(),
-          children: [RevenueDashboard(), Placeholder(), Placeholder()],
+          children: [RevenueDashboard(), Placeholder(), UserSettingsPage()],
         ),
         extendBody: false,
         resizeToAvoidBottomInset: false,
@@ -151,17 +152,6 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
         ? Colors.white
         : kblack000010;
   }
-
-  // Future<void> _saveUserProfileToSharedPref() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   final isUrlExists = prefs.containsKey('userProfile');
-  //   if (!isUrlExists) {
-  //     final user = await ref.read(userProfileProvider.future);
-  //     final string = jsonEncode(user.toMap());
-
-  //     await prefs.setString('userProfile', string);
-  //   }
-  // }
 
   void _observeFcmMessages() {
     // FirebaseMessaging.onBackgroundMessage();
