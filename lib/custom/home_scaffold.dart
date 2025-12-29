@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dime_meridian/pages/document_chat_screen.dart';
 import 'package:dime_meridian/pages/revenue_dashboard.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -122,15 +123,12 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
           foregroundColor: kwhite25525525510,
           onPressed: () async {
             // currentScaffold.currentState!.showBodyScrim(true, 0.5);
-
-            // showBottomSheet(
-            //   context: context,
-            //   builder: (BuildContext context) {
-            //     return CreateTweetBottomsheet(
-            //       model: user,
-            //     );
-            //   },
-            // );
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => DocumentChatScreen(),
+                fullscreenDialog: true, // This makes it slide up like a modal
+              ),
+            );
             // currentScaffold.currentState!.showBodyScrim(false, 0.5);
           },
           child: const HugeIcon(
