@@ -3,7 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart'; // UPDATED IMPORT
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/colors.dart';
-import '../services/document_analysis_service.dart';
+import '../services/financial_ai_service.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
   const DocumentChatScreen({super.key});
@@ -13,7 +13,8 @@ class DocumentChatScreen extends ConsumerStatefulWidget {
 }
 
 class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
-  final DocumentAnalysisService _service = DocumentAnalysisService();
+  // final DocumentAnalysisService _service = DocumentAnalysisService();
+  final FinancialAiService _aiService = FinancialAiService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -25,7 +26,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   // --- ACTIONS ---
 
   Future<void> _pickFile() async {
-    final file = await _service.pickDocument();
+    final file = await _aiService.pickDocument();
     if (file != null) {
       setState(() {
         _selectedFile = file;
@@ -41,19 +42,19 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty && _selectedFile == null) return;
-    if (_selectedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please attach a document first.")),
-      );
-      return;
-    }
+    if (text.isEmpty) return;
+    // if (_selectedFile == null) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text("Please attach a document first.")),
+    //   );
+    //   return;
+    // }
 
     setState(() {
       chatHistory.add({
         "role": "user",
         "text": text.isEmpty ? "Analyze this document" : text,
-        "attachment": _selectedFile!.name,
+        "attachment": _selectedFile?.name ?? "No document selected",
       });
       _isLoading = true;
     });
@@ -61,9 +62,14 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     _scrollToBottom();
 
     try {
-      final response = await _service.analyzeDocument(
-        promptText: text.isEmpty ? "Analyze this document" : text,
-        file: _selectedFile!,
+      // final response = await _service.analyzeDocument(
+      //   promptText: text.isEmpty ? "Analyze this document" : text,
+      //   file: _selectedFile!,
+      // );
+      // Pass the file (if selected) to the service
+      final response = await _aiService.sendMessage(
+        text,
+        attachedFile: _selectedFile,
       );
 
       setState(() {
