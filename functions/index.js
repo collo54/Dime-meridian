@@ -3,12 +3,12 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const {setGlobalOptions} = require("firebase-functions/v2");
-const {onRequest, onCall, HttpsError} = require("firebase-functions/v2/https");
-const {defineSecret} = require("firebase-functions/params");
+const { setGlobalOptions } = require("firebase-functions/v2");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 // const logger = require("firebase-functions/logger");
-const {BigQuery} = require("@google-cloud/bigquery");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const { BigQuery } = require("@google-cloud/bigquery");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const admin = require("firebase-admin");
 const axios = require("axios");
 
@@ -17,7 +17,7 @@ admin.initializeApp();
 // --- CONFIGURATION ---
 
 // Initialize BigQuery for project Dime-meridian
-const bigquery = new BigQuery({projectId: "dime-meridian"});
+const bigquery = new BigQuery({ projectId: "dime-meridian" });
 // Initialize Firestore
 const db = getFirestore();
 
@@ -26,7 +26,7 @@ const revenueCatSecret = defineSecret("REVENUECAT_WEBHOOK_SECRET");
 const elevenLabsApiKey = defineSecret("ELEVENLABS_API_KEY");
 
 // Global Options
-setGlobalOptions({maxInstances: 10});
+setGlobalOptions({ maxInstances: 10 });
 
 // --- FUNCTIONS ---
 
@@ -36,79 +36,79 @@ setGlobalOptions({maxInstances: 10});
  * Ingests subscription events into BigQuery AND Firestore
  */
 exports.revenueCatWebhook = onRequest(
-    {
-      secrets: [revenueCatSecret],
-      region: "us-central1",
-    },
-    async (req, res) => {
+  {
+    secrets: [revenueCatSecret],
+    region: "us-central1",
+  },
+  async (req, res) => {
     // 1. Security Check
-      const expectedToken = revenueCatSecret.value();
-      const receivedToken = req.headers.authorization;
+    const expectedToken = revenueCatSecret.value();
+    const receivedToken = req.headers.authorization;
 
-      // --- DEBUG LOGS (Remove after fixing) ---
-      console.log(`Expected (Secret Manager): "${expectedToken}"`);
-      console.log(`Received (Header): "${receivedToken}"`);
-      // ----------------------------------------
+    // --- DEBUG LOGS (Remove after fixing) ---
+    console.log(`Expected (Secret Manager): "${expectedToken}"`);
+    console.log(`Received (Header): "${receivedToken}"`);
+    // ----------------------------------------
 
-      if (!receivedToken || receivedToken.trim() !== expectedToken.trim()) {
-        console.warn("Unauthorized webhook attempt");
-        return res.status(401).send("Unauthorized");
-      }
+    if (!receivedToken || receivedToken.trim() !== expectedToken.trim()) {
+      console.warn("Unauthorized webhook attempt");
+      return res.status(401).send("Unauthorized");
+    }
 
-      try {
-        const {event} = req.body;
-        if (!event) return res.status(400).send("No event data");
+    try {
+      const { event } = req.body;
+      if (!event) return res.status(400).send("No event data");
 
-        // 2. Prepare Data for BigQuery
-        // Convert timestamp safely to ISO string for BigQuery
-        const eventDate = new Date(event.event_timestamp_ms).toISOString();
+      // 2. Prepare Data for BigQuery
+      // Convert timestamp safely to ISO string for BigQuery
+      const eventDate = new Date(event.event_timestamp_ms).toISOString();
 
-        const bigQueryRow = {
-          event_id: event.id,
-          user_id: event.app_user_id,
-          product_id: event.product_id,
-          amount_usd: event.price || event.price_in_usd || 0.0,
-          store: event.store,
-          type: event.type,
-          timestamp: bigquery.datetime(eventDate),
-        };
+      const bigQueryRow = {
+        event_id: event.id,
+        user_id: event.app_user_id,
+        product_id: event.product_id,
+        amount_usd: event.price || event.price_in_usd || 0.0,
+        store: event.store,
+        type: event.type,
+        timestamp: bigquery.datetime(eventDate),
+      };
 
-        // 3. Prepare Data for Firestore
-        const firestoreDoc = {
-          eventId: event.id,
-          userId: event.app_user_id,
-          productId: event.product_id,
-          amountUsd: event.price || event.price_in_usd || 0.0,
-          store: event.store,
-          type: event.type,
-          rawEvent: event, // Saving raw event is useful for future debugging
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-          eventTimestamp: admin.firestore.Timestamp.fromMillis(event.event_timestamp_ms),
-        };
+      // 3. Prepare Data for Firestore
+      const firestoreDoc = {
+        eventId: event.id,
+        userId: event.app_user_id,
+        productId: event.product_id,
+        amountUsd: event.price || event.price_in_usd || 0.0,
+        store: event.store,
+        type: event.type,
+        rawEvent: event, // Saving raw event is useful for future debugging
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        eventTimestamp: admin.firestore.Timestamp.fromMillis(event.event_timestamp_ms),
+      };
 
-        console.log(`Ingesting event: ${event.type} for ${event.price_in_usd}`);
+      console.log(`Ingesting event: ${event.type} for ${event.price_in_usd}`);
 
-        // 4. Write to BigQuery and Firestore in parallel
-        await Promise.all([
+      // 4. Write to BigQuery and Firestore in parallel
+      await Promise.all([
         // Insert into BigQuery
-          bigquery
-              .dataset("analytics")
-              .table("revenue_events")
-              .insert([bigQueryRow]),
+        bigquery
+          .dataset("analytics")
+          .table("revenue_events")
+          .insert([bigQueryRow]),
 
-          // Insert into Firestore (using event.id as doc ID for idempotency)
-          db.collection("RevenuecatEvents")
-              .doc(event.id)
-              .set(firestoreDoc, {merge: true}),
-        ]);
+        // Insert into Firestore (using event.id as doc ID for idempotency)
+        db.collection("RevenuecatEvents")
+          .doc(event.id)
+          .set(firestoreDoc, { merge: true }),
+      ]);
 
-        return res.status(200).send("Ingested into BigQuery and Firestore");
-      } catch (error) {
-        console.error("Error processing webhook:", error);
-        return res.status(500).send("Internal Server Error");
-      }
-    },
+      return res.status(200).send("Ingested into BigQuery and Firestore");
+    } catch (error) {
+      console.error("Error processing webhook:", error);
+      return res.status(500).send("Internal Server Error");
+    }
+  },
 );
 
 /**
@@ -116,75 +116,48 @@ exports.revenueCatWebhook = onRequest(
  * Called from Flutter to get a secure WebSocket URL for the Conversational AI
  */
 exports.getAgentSignedUrl = onCall(
-    {
-      secrets: [elevenLabsApiKey],
-      region: "us-central1",
-    },
-    async (request) => {
+  {
+    secrets: [elevenLabsApiKey],
+    region: "us-central1",
+  },
+  async (request) => {
     // 1. Verify user is authenticated
-      if (!request.auth) {
-        throw new HttpsError(
-            "unauthenticated",
-            "User must be logged in.",
-        );
-      }
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "User must be logged in.",
+      );
+    }
 
-      // REPLACE THIS WITH YOUR ACTUAL AGENT ID
-      const AGENT_ID = "agent_4001kd4s66yqeajamancdw77zsh6";
+    // REPLACE THIS WITH YOUR ACTUAL AGENT ID
+    const AGENT_ID = "agent_4001kd4s66yqeajamancdw77zsh6";
 
-      // Access the secret value
-      const apiKey = elevenLabsApiKey.value();
+    // Access the secret value
+    const apiKey = elevenLabsApiKey.value();
 
-      try {
+    try {
       // 2. Request signed URL from ElevenLabs
-        const response = await axios.get(
-            `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${AGENT_ID}`,
-            {
-              headers: {
-                "xi-api-key": apiKey,
-              },
-            },
-        );
+      const response = await axios.get(
+        `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${AGENT_ID}`,
+        {
+          headers: {
+            "xi-api-key": apiKey,
+          },
+        },
+      );
 
-        // 3. Return the secure wss:// URL to the client
-        return {signedUrl: response.data.signed_url};
-      } catch (error) {
+      // 3. Return the secure wss:// URL to the client
+      return { signedUrl: response.data.signed_url };
+    } catch (error) {
       // console.error("Error fetching signed URL:", error?.response?.data || error.message);
       // Check if response exists, then check if data exists
-        const errorData = (error.response && error.response.data) ? error.response.data : error.message;
-        console.error("Error fetching signed URL:", errorData);
-        throw new HttpsError("internal", "Failed to connect to AI agent.");
-      }
-    },
+      const errorData = (error.response && error.response.data) ? error.response.data : error.message;
+      console.error("Error fetching signed URL:", errorData);
+      throw new HttpsError("internal", "Failed to connect to AI agent.");
+    }
+  },
 );
 
-/**
- * Fetches raw financial stats for the last 30 days.
- * Returns JSON to the Flutter app.
- */
-// exports.getFinancialStats = onCall(
-//   { region: "us-central1" },
-//   async (request) => {
-//     try {
-//       const query = `
-//                 SELECT
-//                     IFNULL(SUM(amount_usd), 0) as total_revenue,
-//                     COUNT(*) as transaction_count,
-//                     type
-//                 FROM \`dime-meridian.analytics.revenue_events\`
-//                 WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-//                 GROUP BY type
-//             `;
-
-//       const [rows] = await bigquery.query({ query: query });
-//       return { data: rows };
-//     } catch (error) {
-//       console.error("BigQuery Error:", error);
-//       // Return empty data on failure so app doesn't crash
-//       return { data: [], error: error.message };
-//     }
-//   }
-// );
 
 /**
  * Executes a dynamic SQL query generated by Gemini.
@@ -192,37 +165,37 @@ exports.getAgentSignedUrl = onCall(
  * for the service account running this function to prevent SQL injection damage.
  */
 exports.runDynamicBigQuery = onCall(
-    {region: "us-central1"},
-    async (request) => {
+  { region: "us-central1" },
+  async (request) => {
     // 1. Get the SQL query generated by Gemini
-      const sqlQuery = request.data.query;
+    const sqlQuery = request.data.query;
 
-      if (!sqlQuery) {
-        throw new HttpsError("invalid-argument", "No SQL query provided");
-      }
+    if (!sqlQuery) {
+      throw new HttpsError("invalid-argument", "No SQL query provided");
+    }
 
-      console.log(`Executing AI Generated Query: ${sqlQuery}`);
+    console.log(`Executing AI Generated Query: ${sqlQuery}`);
 
-      try {
+    try {
       // 2. Execute against BigQuery
-        const options = {
-          query: sqlQuery,
-          // Ensure we are in the right location
-          location: "us-central1",
-        };
+      const options = {
+        query: sqlQuery,
+        // Ensure we are in the right location
+        location: "us-central1",
+      };
 
-        const [rows] = await bigquery.query(options);
+      const [rows] = await bigquery.query(options);
 
-        // 3. Return results to Flutter
-        // Convert Date objects to strings to ensure JSON serialization works
-        return {
-          data: JSON.parse(JSON.stringify(rows)),
-        };
-      } catch (error) {
-        console.error("BigQuery Error:", error);
-        // Return the error message so Gemini knows it wrote bad SQL and can retry
-        return {error: error.message};
-      }
-    },
+      // 3. Return results to Flutter
+      // Convert Date objects to strings to ensure JSON serialization works
+      return {
+        data: JSON.parse(JSON.stringify(rows)),
+      };
+    } catch (error) {
+      console.error("BigQuery Error:", error);
+      // Return the error message so Gemini knows it wrote bad SQL and can retry
+      return { error: error.message };
+    }
+  },
 );
 

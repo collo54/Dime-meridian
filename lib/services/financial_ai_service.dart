@@ -154,36 +154,6 @@ class FinancialAiService {
     }
   }
 
-  /// Sends a message, handles function calls automatically, and returns the final answer.
-  Future<String> sendMessageTextPromptOnly(String userMessage) async {
-    try {
-      var response = await _chat.sendMessage(Content.text(userMessage));
-
-      // Loop to handle function calls (Gemini might call the tool, then need to summarize)
-      while (response.functionCalls.isNotEmpty) {
-        final functionCall = response.functionCalls.first;
-
-        if (functionCall.name == _toolName) {
-          final sqlQuery = functionCall.args['sqlQuery'] as String;
-
-          // 1. Execute the SQL via Firebase Cloud Functions
-          final apiResult = await _callCloudFunction(sqlQuery);
-
-          // 2. Feed the result back to Gemini
-          response = await _chat.sendMessage(
-            Content.functionResponse(functionCall.name, {'result': apiResult}),
-          );
-        }
-      }
-
-      return response.text ??
-          "I processed the data but couldn't generate a summary.";
-    } catch (e) {
-      debugPrint("AI Error: $e");
-      return "Sorry, I encountered an error analyzing your finances.";
-    }
-  }
-
   /// Helper to call the Cloud Function
   Future<Object> _callCloudFunction(String sqlQuery) async {
     try {

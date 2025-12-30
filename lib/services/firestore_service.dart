@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../models/chat_message_model.dart';
 import '../models/revenue_cat_event_model.dart';
 import '../models/user_profile_model.dart';
 import '../providers/providers.dart';
@@ -218,6 +219,37 @@ class FirestoreService {
                   doc.data() as Map<String, dynamic>,
                 ),
               )
+              .toList(),
+        );
+  }
+
+  // --- AI CHAT HISTORY METHODS ---
+
+  /// Saves a single chat message to Firestore
+  Future<void> saveChatMessage(ChatMessageModel message) async {
+    try {
+      await db
+          .collection('UserProfiles')
+          .doc(uid)
+          .collection('ai_conversations')
+          .doc(message.id)
+          .set(message.toMap());
+    } catch (e) {
+      debugPrint("Error saving chat message: $e");
+    }
+  }
+
+  /// Streams the chat history for the current user, ordered by time
+  Stream<List<ChatMessageModel>> chatHistoryStream() {
+    return db
+        .collection('UserProfiles')
+        .doc(uid)
+        .collection('ai_conversations')
+        .orderBy('createdAt', descending: false) // Oldest at top
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => ChatMessageModel.fromMap(doc.data()))
               .toList(),
         );
   }

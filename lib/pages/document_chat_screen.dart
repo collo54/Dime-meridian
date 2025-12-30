@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart'; // UPDATED IMPORT
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../constants/colors.dart';
+import '../models/chat_message_model.dart';
+import '../providers/providers.dart';
 import '../services/financial_ai_service.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
@@ -13,13 +16,12 @@ class DocumentChatScreen extends ConsumerStatefulWidget {
 }
 
 class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
-  // final DocumentAnalysisService _service = DocumentAnalysisService();
   final FinancialAiService _aiService = FinancialAiService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   // State
-  List<Map<String, String>> chatHistory = [];
+  // List<Map<String, String>> chatHistory = [];
   PlatformFile? _selectedFile;
   bool _isLoading = false;
 
@@ -40,51 +42,107 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     });
   }
 
+  // Future<void> _sendMessage() async {
+  //   final text = _textController.text.trim();
+  //   if (text.isEmpty) return;
+
+  //   setState(() {
+  //     chatHistory.add({
+  //       "role": "user",
+  //       "text": text.isEmpty ? "Analyze this document" : text,
+  //       "attachment": _selectedFile?.name ?? "No document selected",
+  //     });
+  //     _isLoading = true;
+  //   });
+  //   _textController.clear();
+  //   _scrollToBottom();
+
+  //   try {
+  //     // Pass the file (if selected) to the service
+  //     final response = await _aiService.sendMessage(
+  //       text,
+  //       attachedFile: _selectedFile,
+  //     );
+
+  //     setState(() {
+  //       chatHistory.add({
+  //         "role": "model",
+  //         "text": response ?? "No response generated.",
+  //       });
+  //     });
+  //   } catch (e) {
+  //     setState(() {
+  //       chatHistory.add({"role": "model", "text": "Error: ${e.toString()}"});
+  //     });
+  //   } finally {
+  //     setState(() {
+  //       _isLoading = false;
+  //     });
+  //     _scrollToBottom();
+  //   }
+  // }
+
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
-    // if (_selectedFile == null) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text("Please attach a document first.")),
-    //   );
-    //   return;
-    // }
+
+    final user = ref.read(userModelProvider);
+    final firestore = ref.read(cloudFirestoreServiceProvider);
+    final uuid = const Uuid();
+
+    // 1. Save USER message to Firestore
+    final userMsgId = uuid.v4();
+    final userMessage = ChatMessageModel(
+      id: userMsgId,
+      userId: user.uid,
+      text: text,
+      role: MessageRole.user,
+      attachmentName: _selectedFile?.name,
+      createdAt: DateTime.now(),
+    );
+
+    // Optimistic UI update isn't strictly needed with StreamBuilder,
+    // but saving it triggers the stream update.
+    await firestore.saveChatMessage(userMessage);
 
     setState(() {
-      chatHistory.add({
-        "role": "user",
-        "text": text.isEmpty ? "Analyze this document" : text,
-        "attachment": _selectedFile?.name ?? "No document selected",
-      });
       _isLoading = true;
     });
     _textController.clear();
     _scrollToBottom();
 
     try {
-      // final response = await _service.analyzeDocument(
-      //   promptText: text.isEmpty ? "Analyze this document" : text,
-      //   file: _selectedFile!,
-      // );
-      // Pass the file (if selected) to the service
-      final response = await _aiService.sendMessage(
+      // 2. Get AI Response
+      final responseText = await _aiService.sendMessage(
         text,
         attachedFile: _selectedFile,
       );
 
-      setState(() {
-        chatHistory.add({
-          "role": "model",
-          "text": response ?? "No response generated.",
-        });
-      });
+      // 3. Save AI message to Firestore
+      final aiMsgId = uuid.v4();
+      final aiMessage = ChatMessageModel(
+        id: aiMsgId,
+        userId: user.uid,
+        text: responseText,
+        role: MessageRole.model,
+        createdAt: DateTime.now(),
+      );
+      await firestore.saveChatMessage(aiMessage);
     } catch (e) {
-      setState(() {
-        chatHistory.add({"role": "model", "text": "Error: ${e.toString()}"});
-      });
+      // Save error as AI message so user sees it
+      final errorId = uuid.v4();
+      final errorMessage = ChatMessageModel(
+        id: errorId,
+        userId: user.uid,
+        text: "Error: ${e.toString()}",
+        role: MessageRole.model,
+        createdAt: DateTime.now(),
+      );
+      await firestore.saveChatMessage(errorMessage);
     } finally {
       setState(() {
         _isLoading = false;
+        _selectedFile = null; // Clear file after sending
       });
       _scrollToBottom();
     }
@@ -107,9 +165,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   @override
   Widget build(BuildContext context) {
     Brightness brightness = MediaQuery.platformBrightnessOf(context);
-    //  final backgroundColor = const Color(0xFF131314);
-    // final surfaceColor = const Color(0xFF1E1E1E);
-    // final accentColor = Colors.white;
+    final firestore = ref.watch(cloudFirestoreServiceProvider);
 
     return Scaffold(
       //  backgroundColor: backgroundColor,
@@ -138,100 +194,211 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
       ),
       body: Column(
         children: [
-          // 1. Chat Area
+          // 1. Chat Area (StreamBuilder)
           Expanded(
-            child: chatHistory.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: chatHistory.length,
-                    itemBuilder: (context, index) {
-                      final msg = chatHistory[index];
-                      final isUser = msg['role'] == 'user';
-                      return Align(
-                        alignment: isUser
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          padding: const EdgeInsets.all(16),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.85,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isUser
-                                ? const Color.fromARGB(80, 128, 128, 128)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (msg.containsKey('attachment')) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black26,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.description,
-                                        size: 14,
-                                        color: Colors.white70,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        msg['attachment']!,
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                              ],
-                              // UPDATED MARKDOWN WIDGET
-                              MarkdownBody(
-                                data: msg['text']!,
-                                styleSheet: MarkdownStyleSheet(
-                                  p: TextStyle(
-                                    // color: accentColor,
-                                    fontSize: 16,
-                                  ),
-                                  strong: TextStyle(
-                                    // color: accentColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  // Add more styling as needed for headers, lists, etc.
-                                  h1: TextStyle(
-                                    // color: accentColor,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  h2: TextStyle(
-                                    // color: accentColor,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  // listBullet: TextStyle(color: accentColor),
-                                ),
-                              ),
-                            ],
-                          ),
+            child: StreamBuilder<List<ChatMessageModel>>(
+              stream: firestore.chatHistoryStream(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError)
+                  return Center(child: Text("Error: ${snapshot.error}"));
+                if (!snapshot.hasData)
+                  return const Center(child: CircularProgressIndicator());
+
+                final messages = snapshot.data!;
+
+                if (messages.isEmpty) return _buildEmptyState();
+
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount:
+                      messages.length +
+                      (_isLoading ? 1 : 0), // Add 1 for loading indicator
+                  itemBuilder: (context, index) {
+                    // Show loading indicator at the bottom if waiting
+                    if (index == messages.length) {
+                      return const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
                         ),
                       );
-                    },
-                  ),
+                    }
+
+                    final msg = messages[index];
+                    final isUser = msg.role == MessageRole.user;
+
+                    return Align(
+                      alignment: isUser
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.all(16),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.85,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isUser
+                              ? const Color.fromARGB(80, 128, 128, 128)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (msg.attachmentName != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black26,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.description,
+                                      size: 14,
+                                      color: Colors.white70,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      msg.attachmentName!,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            MarkdownBody(
+                              data: msg.text,
+                              styleSheet: MarkdownStyleSheet(
+                                p: const TextStyle(fontSize: 16),
+                                strong: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                h1: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                h2: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
+          // // 1. Chat Area
+          // Expanded(
+          //   child: chatHistory.isEmpty
+          //       ? _buildEmptyState()
+          //       : ListView.builder(
+          //           controller: _scrollController,
+          //           padding: const EdgeInsets.all(16),
+          //           itemCount: chatHistory.length,
+          //           itemBuilder: (context, index) {
+          //             final msg = chatHistory[index];
+          //             final isUser = msg['role'] == 'user';
+          //             return Align(
+          //               alignment: isUser
+          //                   ? Alignment.centerRight
+          //                   : Alignment.centerLeft,
+          //               child: Container(
+          //                 margin: const EdgeInsets.symmetric(vertical: 8),
+          //                 padding: const EdgeInsets.all(16),
+          //                 constraints: BoxConstraints(
+          //                   maxWidth: MediaQuery.of(context).size.width * 0.85,
+          //                 ),
+          //                 decoration: BoxDecoration(
+          //                   color: isUser
+          //                       ? const Color.fromARGB(80, 128, 128, 128)
+          //                       : Colors.transparent,
+          //                   borderRadius: BorderRadius.circular(18),
+          //                 ),
+          //                 child: Column(
+          //                   crossAxisAlignment: CrossAxisAlignment.start,
+          //                   children: [
+          //                     if (msg.containsKey('attachment')) ...[
+          //                       Container(
+          //                         padding: const EdgeInsets.symmetric(
+          //                           horizontal: 8,
+          //                           vertical: 4,
+          //                         ),
+          //                         decoration: BoxDecoration(
+          //                           color: Colors.black26,
+          //                           borderRadius: BorderRadius.circular(8),
+          //                         ),
+          //                         child: Row(
+          //                           mainAxisSize: MainAxisSize.min,
+          //                           children: [
+          //                             const Icon(
+          //                               Icons.description,
+          //                               size: 14,
+          //                               color: Colors.white70,
+          //                             ),
+          //                             const SizedBox(width: 4),
+          //                             Text(
+          //                               msg['attachment']!,
+          //                               style: const TextStyle(
+          //                                 color: Colors.white70,
+          //                                 fontSize: 12,
+          //                               ),
+          //                             ),
+          //                           ],
+          //                         ),
+          //                       ),
+          //                       const SizedBox(height: 8),
+          //                     ],
+          //                     // UPDATED MARKDOWN WIDGET
+          //                     MarkdownBody(
+          //                       data: msg['text']!,
+          //                       styleSheet: MarkdownStyleSheet(
+          //                         p: TextStyle(
+          //                           // color: accentColor,
+          //                           fontSize: 16,
+          //                         ),
+          //                         strong: TextStyle(
+          //                           // color: accentColor,
+          //                           fontWeight: FontWeight.bold,
+          //                         ),
+          //                         // Add more styling as needed for headers, lists, etc.
+          //                         h1: TextStyle(
+          //                           // color: accentColor,
+          //                           fontSize: 24,
+          //                           fontWeight: FontWeight.bold,
+          //                         ),
+          //                         h2: TextStyle(
+          //                           // color: accentColor,
+          //                           fontSize: 20,
+          //                           fontWeight: FontWeight.bold,
+          //                         ),
+          //                         // listBullet: TextStyle(color: accentColor),
+          //                       ),
+          //                     ),
+          //                   ],
+          //                 ),
+          //               ),
+          //             );
+          //           },
+          //         ),
+          // ),
 
           // 2. Input Area
           Container(
