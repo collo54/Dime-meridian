@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dime_meridian/pages/login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -63,26 +62,8 @@ class _AuthStateState extends ConsumerState<AuthState> {
     return authStateAsync.when(
       data: (user) {
         if (user != null || FirebaseAuth.instance.currentUser != null) {
-          Fluttertoast.showToast(
-            msg: "user found",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            timeInSecForIosWeb: 1,
-            backgroundColor: Colors.greenAccent,
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
           return const HomeScaffold();
         } else {
-          Fluttertoast.showToast(
-            msg: "empty user",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            timeInSecForIosWeb: 1,
-            backgroundColor: Colors.redAccent,
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
           return const LoginPage();
         }
       },

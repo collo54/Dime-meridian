@@ -337,35 +337,4 @@ class FirestoreService {
       rethrow;
     }
   }
-
-  // // --- AI CHAT HISTORY METHODS ---
-
-  // /// Saves a single chat message to Firestore
-  // Future<void> saveChatMessage(ChatMessageModel message) async {
-  //   try {
-  //     await db
-  //         .collection('UserProfiles')
-  //         .doc(uid)
-  //         .collection('ai_conversations')
-  //         .doc(message.id)
-  //         .set(message.toMap());
-  //   } catch (e) {
-  //     debugPrint("Error saving chat message: $e");
-  //   }
-  // }
-
-  // /// Streams the chat history for the current user, ordered by time
-  // Stream<List<ChatMessageModel>> chatHistoryStream() {
-  //   return db
-  //       .collection('UserProfiles')
-  //       .doc(uid)
-  //       .collection('ai_conversations')
-  //       .orderBy('createdAt', descending: false) // Oldest at top
-  //       .snapshots()
-  //       .map(
-  //         (snapshot) => snapshot.docs
-  //             .map((doc) => ChatMessageModel.fromMap(doc.data()))
-  //             .toList(),
-  //       );
-  // }
 }

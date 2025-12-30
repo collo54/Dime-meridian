@@ -14,11 +14,7 @@ import '../../services/auth_service.dart';
 enum EmailSignInFormType { signIn, register }
 
 class LoginMobileLayout extends ConsumerStatefulWidget {
-  LoginMobileLayout({
-    //required this.currentScaffold,
-    super.key,
-  });
-  //GlobalKey<ScaffoldState> currentScaffold;
+  const LoginMobileLayout({super.key});
 
   @override
   ConsumerState<LoginMobileLayout> createState() => _LoginMobileLayoutState();
@@ -28,47 +24,22 @@ class _LoginMobileLayoutState extends ConsumerState<LoginMobileLayout> {
   final _auth = AuthService();
   EmailSignInFormType _formType = EmailSignInFormType.register;
   final _formKey = GlobalKey<FormState>();
-  final _formKeySmsCode = GlobalKey<FormState>();
-  final _formKeyPhoneNumber = GlobalKey<FormState>();
+
   String? _email;
   String? _password;
   String? verId;
-  // late TapGestureRecognizer _onTapRecognizer;
-  // ignore: prefer_final_fields
-  String _countryPhoneCode = ' Phone Number ';
+
   final TextEditingController _controller = TextEditingController();
-  String? _phone;
-  String? _smsCode;
+
   bool _loading = false;
-  // late GoogleMapController mapController;
-  // late String _mapStyle;
 
   @override
   void initState() {
     super.initState();
-    //  _onTapRecognizer = TapGestureRecognizer()..onTap = _handlePress;
-    // SchedulerBinding.instance.addPostFrameCallback((_) {
-    //   rootBundle.loadString('assets/style/map_style_dark.txt').then((string) {
-    //     _mapStyle = string;
-    //   });
-    //  });
-
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   widget.currentScaffold.currentState!.showBodyScrim(true, 0.6);
-    //   showDialog(
-    //     context: context,
-    //     builder: (BuildContext context) {
-    //       widget.currentScaffold.currentState!.showBodyScrim(true, 0.6);
-    //       return const LocationDisclosureDialog();
-    //     },
-    //   );
-    // });
   }
 
   @override
   void dispose() {
-    // widget.currentScaffold.currentState!.showBodyScrim(false, 0.5);
-    //  _onTapRecognizer.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -121,60 +92,6 @@ class _LoginMobileLayoutState extends ConsumerState<LoginMobileLayout> {
     return user;
   }
 
-  // Future<String?> _submitFormVerifyPhoneNumber() async {
-  //   try {
-  //     if (_validateAndSaveFormPhoneNumber()) {
-  //       final result = await _VerifyPhone();
-  //       debugPrint('verify phone number');
-
-  //       setState(() {
-  //         verId = result;
-  //         _loading = false;
-  //       });
-  //       return result;
-  //     }
-  //   } catch (e) {
-  //     debugPrint(e.toString());
-  //   }
-  //   return null;
-  // }
-
-  // Future<UserModel?> _submitFormSmsCode() async {
-  //   try {
-  //     if (_validateAndSaveFormSmsCode()) {
-  //       final user = await _auth.signInWithOTP(_smsCode!, verId!);
-  //       debugPrint('log in with otp');
-  //       if (user == null) {
-  //         setState(() {
-  //           _loading = false;
-  //         });
-  //         return null;
-  //       }
-  //       setState(() {
-  //         _loading = false;
-  //       });
-  //       return user;
-  //     }
-  //   } catch (e) {
-  //     debugPrint(e.toString());
-  //   }
-  //   return null;
-  // }
-
-  // Future<String?> _VerifyPhone() async {
-  //   debugPrint('phone entered: $_phone');
-  //   Fluttertoast.showToast(
-  //       msg: 'phone entered: $_phone',
-  //       toastLength: Toast.LENGTH_LONG,
-  //       gravity: ToastGravity.BOTTOM,
-  //       timeInSecForIosWeb: 1,
-  //       backgroundColor: Colors.blue,
-  //       textColor: Colors.white,
-  //       fontSize: 16.0);
-  //   final verId = await _auth.signInWithPhoneNumberAndroid(_phone!);
-  //   return verId;
-  // }
-
   @override
   Widget build(BuildContext context) {
     Brightness brightness = MediaQuery.platformBrightnessOf(context);
@@ -216,20 +133,6 @@ class _LoginMobileLayoutState extends ConsumerState<LoginMobileLayout> {
                   ),
                 ),
 
-                // const SizedBox(
-                //   height: 8,
-                // ),
-                // Text(
-                //   'Ready to go',
-                //   style: GoogleFonts.inter(
-                //     textStyle: const TextStyle(
-                //       height: 1.56,
-                //       color: kblackgrey79797907,
-                //       fontSize: 16,
-                //       fontWeight: FontWeight.w600,
-                //     ),
-                //   ),
-                // ),
                 const SizedBox(height: 19),
 
                 SizedBox(width: 248, child: _buildFormEmail()),
@@ -247,23 +150,6 @@ class _LoginMobileLayoutState extends ConsumerState<LoginMobileLayout> {
                           if (user == null) {
                             setState(() => _loading = false);
                           }
-                          // setState(() {
-                          //   _loading = true;
-                          // });
-                          // widget.currentScaffold.currentState!.showBodyScrim(
-                          //   true,
-                          //   0.5,
-                          // );
-                          // final user = await _logInEmail();
-                          // if (mounted) {
-                          //   if (user == null) {
-                          //     setState(() {
-                          //       _loading = false;
-                          //     });
-                          //     widget.currentScaffold.currentState!
-                          //         .showBodyScrim(false, 0.5);
-                          //   }
-                          // }
                         }
                       : null,
                   color: kdarkblue,
@@ -362,23 +248,6 @@ class _LoginMobileLayoutState extends ConsumerState<LoginMobileLayout> {
                           if (user == null) {
                             setState(() => _loading = false);
                           }
-                          // setState(() {
-                          //   _loading = true;
-                          // });
-                          // widget.currentScaffold.currentState!.showBodyScrim(
-                          //   true,
-                          //   0.5,
-                          // );
-                          // final user = await _loginGoogle();
-                          // if (mounted) {
-                          //   if (user == null) {
-                          //     setState(() {
-                          //       _loading = false;
-                          //     });
-                          //     widget.currentScaffold.currentState!
-                          //         .showBodyScrim(false, 0.5);
-                          //   }
-                          // }
                         },
                   color: kdarkblue,
                   shape: const RoundedRectangleBorder(
