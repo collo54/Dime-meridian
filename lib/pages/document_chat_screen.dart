@@ -7,12 +7,14 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import '../constants/colors.dart';
 import '../models/chat_message_model.dart';
+import '../models/chat_session_model.dart';
 import '../providers/providers.dart';
 import '../services/eleven_labs_agent_service.dart';
 import '../services/financial_ai_service.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
-  const DocumentChatScreen({super.key});
+  DocumentChatScreen({this.currentConversationId, super.key});
+  String? currentConversationId;
 
   @override
   ConsumerState<DocumentChatScreen> createState() => _DocumentChatScreenState();
@@ -24,6 +26,8 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final ElevenLabsAgentService _agentService = ElevenLabsAgentService();
   final SpeechToText _speech = SpeechToText();
+  // Inside _DocumentChatScreenState
+  String? _currentConversationId; // Null means we are in a "New Chat" state
 
   // State
   // List<Map<String, String>> chatHistory = [];
@@ -35,6 +39,9 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.currentConversationId != null) {
+      _currentConversationId = widget.currentConversationId!;
+    }
     _initSpeech();
   }
 
@@ -70,46 +77,6 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     });
   }
 
-  // Future<void> _sendMessage() async {
-  //   final text = _textController.text.trim();
-  //   if (text.isEmpty) return;
-
-  //   setState(() {
-  //     chatHistory.add({
-  //       "role": "user",
-  //       "text": text.isEmpty ? "Analyze this document" : text,
-  //       "attachment": _selectedFile?.name ?? "No document selected",
-  //     });
-  //     _isLoading = true;
-  //   });
-  //   _textController.clear();
-  //   _scrollToBottom();
-
-  //   try {
-  //     // Pass the file (if selected) to the service
-  //     final response = await _aiService.sendMessage(
-  //       text,
-  //       attachedFile: _selectedFile,
-  //     );
-
-  //     setState(() {
-  //       chatHistory.add({
-  //         "role": "model",
-  //         "text": response ?? "No response generated.",
-  //       });
-  //     });
-  //   } catch (e) {
-  //     setState(() {
-  //       chatHistory.add({"role": "model", "text": "Error: ${e.toString()}"});
-  //     });
-  //   } finally {
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //     _scrollToBottom();
-  //   }
-  // }
-
   // --- VOICE LOGIC ---
   void _startListening() async {
     if (!_speechEnabled) return;
@@ -140,6 +107,24 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
     final firestore = ref.read(cloudFirestoreServiceProvider);
     final uuid = const Uuid();
 
+    // 1. If this is a new chat, create the Session ID and save the Session Header
+    if (_currentConversationId == null) {
+      final newId = uuid.v4();
+
+      final newSession = ChatSessionModel(
+        id: newId,
+        title: text, // Use first message as title (e.g., "Revenue analysis")
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Save the "Folder"
+      await firestore.saveChatSession(newSession);
+      setState(() {
+        _currentConversationId = newId;
+      });
+    }
+
     // 1. Save USER message to Firestore
     final userMsgId = uuid.v4();
     final userMessage = ChatMessageModel(
@@ -153,7 +138,11 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
 
     // Optimistic UI update isn't strictly needed with StreamBuilder,
     // but saving it triggers the stream update.
-    await firestore.saveChatMessage(userMessage);
+    // 3. Save to the specific conversation ID
+    await firestore.saveChatMessage(
+      conversationId: _currentConversationId!,
+      message: userMessage,
+    );
 
     setState(() {
       _isLoading = true;
@@ -177,7 +166,11 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
         role: MessageRole.model,
         createdAt: DateTime.now(),
       );
-      await firestore.saveChatMessage(aiMessage);
+      // 4. When saving AI response:
+      await firestore.saveChatMessage(
+        conversationId: _currentConversationId!,
+        message: aiMessage,
+      );
       // 4. TRIGGER THE AGENT
       // We pass the full Gemini response (which contains the data insights)
       // to the Agent. The Agent will summarize and speak it.
@@ -194,7 +187,11 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
         role: MessageRole.model,
         createdAt: DateTime.now(),
       );
-      await firestore.saveChatMessage(errorMessage);
+      // 4. When saving AI response:
+      await firestore.saveChatMessage(
+        conversationId: _currentConversationId!,
+        message: errorMessage,
+      );
     } finally {
       setState(() {
         _isLoading = false;
@@ -252,114 +249,123 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
         children: [
           // 1. Chat Area (StreamBuilder)
           Expanded(
-            child: StreamBuilder<List<ChatMessageModel>>(
-              stream: firestore.chatHistoryStream(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError)
-                  return Center(child: Text("Error: ${snapshot.error}"));
-                if (!snapshot.hasData)
-                  return const Center(child: CircularProgressIndicator());
+            child: _currentConversationId == null
+                ? _buildEmptyState() // "Start a new chat" UI
+                : StreamBuilder<List<ChatMessageModel>>(
+                    stream: firestore.chatMessagesStream(
+                      _currentConversationId!,
+                    ),
+                    builder: (context, snapshot) {
+                      if (_currentConversationId == null)
+                        return _buildEmptyState();
+                      if (snapshot.hasError) {
+                        return Center(child: Text("Error: ${snapshot.error}"));
+                      }
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                final messages = snapshot.data!;
+                      final messages = snapshot.data!;
 
-                if (messages.isEmpty) return _buildEmptyState();
+                      if (messages.isEmpty) return _buildEmptyState();
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount:
-                      messages.length +
-                      (_isLoading ? 1 : 0), // Add 1 for loading indicator
-                  itemBuilder: (context, index) {
-                    // Show loading indicator at the bottom if waiting
-                    if (index == messages.length) {
-                      return const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-
-                    final msg = messages[index];
-                    final isUser = msg.role == MessageRole.user;
-
-                    return Align(
-                      alignment: isUser
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
+                      return ListView.builder(
+                        controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.85,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUser
-                              ? const Color.fromARGB(80, 128, 128, 128)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (msg.attachmentName != null) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black26,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.description,
-                                      size: 14,
-                                      color: Colors.white70,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      msg.attachmentName!,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
+                        itemCount:
+                            messages.length +
+                            (_isLoading ? 1 : 0), // Add 1 for loading indicator
+                        itemBuilder: (context, index) {
+                          // Show loading indicator at the bottom if waiting
+                          if (index == messages.length) {
+                            return const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+
+                          final msg = messages[index];
+                          final isUser = msg.role == MessageRole.user;
+
+                          return Align(
+                            alignment: isUser
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.all(16),
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * 0.85,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isUser
+                                    ? const Color.fromARGB(80, 128, 128, 128)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (msg.attachmentName != null) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black26,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.description,
+                                            size: 14,
+                                            color: Colors.white70,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            msg.attachmentName!,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
+                                    const SizedBox(height: 8),
                                   ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                            ],
-                            MarkdownBody(
-                              data: msg.text,
-                              styleSheet: MarkdownStyleSheet(
-                                p: const TextStyle(fontSize: 16),
-                                strong: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                h1: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                h2: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                  MarkdownBody(
+                                    data: msg.text,
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: const TextStyle(fontSize: 16),
+                                      strong: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      h1: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      h2: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
           // Use ValueListenableBuilder to listen to the service state
           ValueListenableBuilder<bool>(
@@ -489,7 +495,12 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                                           ? Colors.greenAccent
                                           : (_isListening
                                                 ? Colors.redAccent
-                                                : Colors.white),
+                                                : const Color.fromARGB(
+                                                    255,
+                                                    184,
+                                                    184,
+                                                    184,
+                                                  )),
                                     ),
                               // Icon(
                               //     // Change icon based on state
@@ -543,6 +554,7 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
                         ],
                       ),
                     ),
+                    SizedBox(height: 4),
                   ],
                 ),
               );

@@ -9,6 +9,7 @@ import 'package:hugeicons/hugeicons.dart';
 
 import '../constants/colors.dart';
 
+import '../pages/chat_history_page.dart';
 import '../pages/user_settings_page.dart';
 import '../providers/providers.dart';
 
@@ -46,13 +47,15 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
     final permissionService = ref.watch(permissionServiceProvider);
 
     return DefaultTabController(
-      length: 3,
+      length: 2, //3,
       initialIndex: currentTab,
       child: Scaffold(
         // backgroundColor: kblack00005,
         body: TabBarView(
           physics: NeverScrollableScrollPhysics(),
-          children: [RevenueDashboard(), Placeholder(), UserSettingsPage()],
+          children: [
+            RevenueDashboard(), ChatHistoryPage(), //UserSettingsPage()
+          ],
         ),
         extendBody: false,
         resizeToAvoidBottomInset: false,
@@ -93,7 +96,7 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
                 // Tab 0: Home / Buzz
                 Tab(
                   icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedHome01,
+                    icon: HugeIcons.strokeRoundedChart01,
                     color: _getTabColor(currentTab, 0, brightness),
                     size: 24.0,
                   ),
@@ -101,19 +104,19 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
                 // Tab 1: Shorts
                 Tab(
                   icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedPlayList,
+                    icon: HugeIcons.strokeRoundedAiChat01,
                     color: _getTabColor(currentTab, 1, brightness),
                     size: 24.0,
                   ),
                 ),
                 // Tab 2: Add (No badge needed)
-                Tab(
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedAdd01,
-                    color: _getTabColor(currentTab, 2, brightness),
-                    size: 24.0,
-                  ),
-                ),
+                // Tab(
+                //   icon: HugeIcon(
+                //     icon: HugeIcons.strokeRoundedAdd01,
+                //     color: _getTabColor(currentTab, 2, brightness),
+                //     size: 24.0,
+                //   ),
+                // ),
               ],
             ),
           ),
@@ -145,7 +148,7 @@ class _HomeScaffoldState extends ConsumerState<HomeScaffold> {
   // Copy your existing color logic into here.
   Color _getTabColor(int currentTab, int tabIndex, Brightness brightness) {
     return currentTab == tabIndex
-        ? kdarkblue
+        ? financeGold
         : brightness == Brightness.dark
         ? Colors.white
         : kblack000010;

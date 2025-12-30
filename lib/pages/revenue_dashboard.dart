@@ -1,16 +1,23 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hugeicons/hugeicons.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import '../models/revenue_cat_event_model.dart';
+import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../widgets/revenue_chart_widget.dart';
 import '../widgets/smart_chart_widget.dart'; // Import the new chart
 import '../providers/providers.dart';
 
 class RevenueDashboard extends ConsumerWidget {
-  const RevenueDashboard({super.key});
+  RevenueDashboard({super.key});
+  final _auth = AuthService();
+  final GlobalKey<ScaffoldState> currentScaffold = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    Brightness brightness = MediaQuery.platformBrightnessOf(context);
     final userModel = ref.read(userModelProvider);
     final firestoreService = FirestoreService(uid: userModel.uid);
 
@@ -26,7 +33,35 @@ class RevenueDashboard extends ConsumerWidget {
         selectedEventType == 'RENEWAL';
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Analytics Dashboard"), elevation: 0),
+      key: currentScaffold,
+      appBar: AppBar(
+        title: const Text("Analytics Dashboard"),
+        elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: IconButton(
+              onPressed: () async {
+                currentScaffold.currentState!.showBodyScrim(true, 0.5);
+                if (!kIsWeb) {
+                  await Purchases.logOut();
+                }
+                await _auth.signOut();
+                final user = _auth.currentUser();
+
+                currentScaffold.currentState!.showBodyScrim(false, 0.5);
+              },
+              icon: HugeIcon(
+                icon: HugeIcons.strokeRoundedLogout01,
+                color: brightness == Brightness.light
+                    ? Colors.black
+                    : Colors.white,
+                size: 24.0,
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/chat_message_model.dart';
+import '../models/chat_session_model.dart';
 import '../models/revenue_cat_event_model.dart';
 import '../models/user_profile_model.dart';
 import '../providers/providers.dart';
@@ -223,29 +224,76 @@ class FirestoreService {
         );
   }
 
-  // --- AI CHAT HISTORY METHODS ---
+  // --- AI CONVERSATION METHODS ---
 
-  /// Saves a single chat message to Firestore
-  Future<void> saveChatMessage(ChatMessageModel message) async {
+  /// 1. Create or Update a Conversation Session (The "Folder")
+  /// Call this when the FIRST message is sent in a new chat.
+  Future<void> saveChatSession(ChatSessionModel session) async {
     try {
       await db
           .collection('UserProfiles')
           .doc(uid)
-          .collection('ai_conversations')
+          .collection('conversations') // New Collection
+          .doc(session.id)
+          .set(session.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Error saving chat session: $e");
+    }
+  }
+
+  /// 2. Save a Message to a SPECIFIC Conversation
+  Future<void> saveChatMessage({
+    required String conversationId,
+    required ChatMessageModel message,
+  }) async {
+    try {
+      // A. Save the message in the sub-collection
+      await db
+          .collection('UserProfiles')
+          .doc(uid)
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages') // Sub-collection
           .doc(message.id)
           .set(message.toMap());
+
+      // B. Update the "Last Updated" time on the parent session
+      // This ensures the most recent chat stays at the top of the history list
+      await db
+          .collection('UserProfiles')
+          .doc(uid)
+          .collection('conversations')
+          .doc(conversationId)
+          .update({'updatedAt': FieldValue.serverTimestamp()});
     } catch (e) {
       debugPrint("Error saving chat message: $e");
     }
   }
 
-  /// Streams the chat history for the current user, ordered by time
-  Stream<List<ChatMessageModel>> chatHistoryStream() {
+  /// 3. Stream the LIST of conversations (For the History Sidebar/Drawer)
+  Stream<List<ChatSessionModel>> chatSessionsStream() {
     return db
         .collection('UserProfiles')
         .doc(uid)
-        .collection('ai_conversations')
-        .orderBy('createdAt', descending: false) // Oldest at top
+        .collection('conversations')
+        .orderBy('updatedAt', descending: true) // Newest chats first
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => ChatSessionModel.fromMap(doc.data()))
+              .toList(),
+        );
+  }
+
+  /// 4. Stream messages for ONE specific conversation
+  Stream<List<ChatMessageModel>> chatMessagesStream(String conversationId) {
+    return db
+        .collection('UserProfiles')
+        .doc(uid)
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('createdAt', descending: false) // Oldest first (bubble order)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -253,4 +301,71 @@ class FirestoreService {
               .toList(),
         );
   }
+
+  /// Deletes a conversation and all its messages
+  Future<void> deleteChatSession(String conversationId) async {
+    try {
+      final sessionRef = db
+          .collection('UserProfiles')
+          .doc(uid)
+          .collection('conversations')
+          .doc(conversationId);
+
+      final messagesRef = sessionRef.collection('messages');
+
+      // 1. Get all messages in the sub-collection
+      final messagesSnapshot = await messagesRef.get();
+
+      // 2. Create a batch to delete everything at once
+      WriteBatch batch = db.batch();
+
+      // 3. Queue up message deletions
+      for (var doc in messagesSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 4. Queue up the session document deletion
+      batch.delete(sessionRef);
+
+      // 5. Commit the delete
+      await batch.commit();
+
+      debugPrint("Successfully deleted session: $conversationId");
+    } catch (e) {
+      debugPrint("Error deleting chat session: $e");
+      // Rethrow so UI can handle the error (show toast, etc)
+      rethrow;
+    }
+  }
+
+  // // --- AI CHAT HISTORY METHODS ---
+
+  // /// Saves a single chat message to Firestore
+  // Future<void> saveChatMessage(ChatMessageModel message) async {
+  //   try {
+  //     await db
+  //         .collection('UserProfiles')
+  //         .doc(uid)
+  //         .collection('ai_conversations')
+  //         .doc(message.id)
+  //         .set(message.toMap());
+  //   } catch (e) {
+  //     debugPrint("Error saving chat message: $e");
+  //   }
+  // }
+
+  // /// Streams the chat history for the current user, ordered by time
+  // Stream<List<ChatMessageModel>> chatHistoryStream() {
+  //   return db
+  //       .collection('UserProfiles')
+  //       .doc(uid)
+  //       .collection('ai_conversations')
+  //       .orderBy('createdAt', descending: false) // Oldest at top
+  //       .snapshots()
+  //       .map(
+  //         (snapshot) => snapshot.docs
+  //             .map((doc) => ChatMessageModel.fromMap(doc.data()))
+  //             .toList(),
+  //       );
+  // }
 }
