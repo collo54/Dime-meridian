@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart'; // UPDATED IMPORT
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import '../constants/colors.dart';
 import '../models/chat_message_model.dart';
 import '../providers/providers.dart';
+import '../services/eleven_labs_agent_service.dart';
 import '../services/financial_ai_service.dart';
 
 class DocumentChatScreen extends ConsumerStatefulWidget {
@@ -19,11 +22,36 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   final FinancialAiService _aiService = FinancialAiService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ElevenLabsAgentService _agentService = ElevenLabsAgentService();
+  final SpeechToText _speech = SpeechToText();
 
   // State
   // List<Map<String, String>> chatHistory = [];
   PlatformFile? _selectedFile;
   bool _isLoading = false;
+  bool _isListening = false; // Track mic state
+  bool _speechEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSpeech();
+  }
+
+  @override
+  void dispose() {
+    _agentService.disconnect(); // Cleanup agent connection
+    super.dispose();
+  }
+
+  void _initSpeech() async {
+    // Request microphone permission on init
+    var status = await Permission.microphone.request();
+    if (status.isGranted) {
+      _speechEnabled = await _speech.initialize();
+      setState(() {});
+    }
+  }
 
   // --- ACTIONS ---
 
@@ -82,6 +110,28 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
   //   }
   // }
 
+  // --- VOICE LOGIC ---
+  void _startListening() async {
+    if (!_speechEnabled) return;
+
+    await _speech.listen(
+      onResult: (result) {
+        setState(() {
+          _textController.text = result.recognizedWords;
+        });
+      },
+    );
+    setState(() => _isListening = true);
+  }
+
+  void _stopListening() async {
+    await _speech.stop();
+    setState(() => _isListening = false);
+
+    // Optional: Auto-send after stopping
+    if (_textController.text.isNotEmpty) _sendMessage();
+  }
+
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -128,6 +178,12 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
         createdAt: DateTime.now(),
       );
       await firestore.saveChatMessage(aiMessage);
+      // 4. TRIGGER THE AGENT
+      // We pass the full Gemini response (which contains the data insights)
+      // to the Agent. The Agent will summarize and speak it.
+      if (responseText != null && responseText.isNotEmpty) {
+        await _agentService.startSession(contextText: responseText);
+      }
     } catch (e) {
       // Save error as AI message so user sees it
       final errorId = uuid.v4();
@@ -305,224 +361,192 @@ class _DocumentChatScreenState extends ConsumerState<DocumentChatScreen> {
               },
             ),
           ),
-          // // 1. Chat Area
-          // Expanded(
-          //   child: chatHistory.isEmpty
-          //       ? _buildEmptyState()
-          //       : ListView.builder(
-          //           controller: _scrollController,
-          //           padding: const EdgeInsets.all(16),
-          //           itemCount: chatHistory.length,
-          //           itemBuilder: (context, index) {
-          //             final msg = chatHistory[index];
-          //             final isUser = msg['role'] == 'user';
-          //             return Align(
-          //               alignment: isUser
-          //                   ? Alignment.centerRight
-          //                   : Alignment.centerLeft,
-          //               child: Container(
-          //                 margin: const EdgeInsets.symmetric(vertical: 8),
-          //                 padding: const EdgeInsets.all(16),
-          //                 constraints: BoxConstraints(
-          //                   maxWidth: MediaQuery.of(context).size.width * 0.85,
-          //                 ),
-          //                 decoration: BoxDecoration(
-          //                   color: isUser
-          //                       ? const Color.fromARGB(80, 128, 128, 128)
-          //                       : Colors.transparent,
-          //                   borderRadius: BorderRadius.circular(18),
-          //                 ),
-          //                 child: Column(
-          //                   crossAxisAlignment: CrossAxisAlignment.start,
-          //                   children: [
-          //                     if (msg.containsKey('attachment')) ...[
-          //                       Container(
-          //                         padding: const EdgeInsets.symmetric(
-          //                           horizontal: 8,
-          //                           vertical: 4,
-          //                         ),
-          //                         decoration: BoxDecoration(
-          //                           color: Colors.black26,
-          //                           borderRadius: BorderRadius.circular(8),
-          //                         ),
-          //                         child: Row(
-          //                           mainAxisSize: MainAxisSize.min,
-          //                           children: [
-          //                             const Icon(
-          //                               Icons.description,
-          //                               size: 14,
-          //                               color: Colors.white70,
-          //                             ),
-          //                             const SizedBox(width: 4),
-          //                             Text(
-          //                               msg['attachment']!,
-          //                               style: const TextStyle(
-          //                                 color: Colors.white70,
-          //                                 fontSize: 12,
-          //                               ),
-          //                             ),
-          //                           ],
-          //                         ),
-          //                       ),
-          //                       const SizedBox(height: 8),
-          //                     ],
-          //                     // UPDATED MARKDOWN WIDGET
-          //                     MarkdownBody(
-          //                       data: msg['text']!,
-          //                       styleSheet: MarkdownStyleSheet(
-          //                         p: TextStyle(
-          //                           // color: accentColor,
-          //                           fontSize: 16,
-          //                         ),
-          //                         strong: TextStyle(
-          //                           // color: accentColor,
-          //                           fontWeight: FontWeight.bold,
-          //                         ),
-          //                         // Add more styling as needed for headers, lists, etc.
-          //                         h1: TextStyle(
-          //                           // color: accentColor,
-          //                           fontSize: 24,
-          //                           fontWeight: FontWeight.bold,
-          //                         ),
-          //                         h2: TextStyle(
-          //                           // color: accentColor,
-          //                           fontSize: 20,
-          //                           fontWeight: FontWeight.bold,
-          //                         ),
-          //                         // listBullet: TextStyle(color: accentColor),
-          //                       ),
-          //                     ),
-          //                   ],
-          //                 ),
-          //               ),
-          //             );
-          //           },
-          //         ),
-          // ),
-
-          // 2. Input Area
-          Container(
-            padding: const EdgeInsets.all(16),
-            // decoration: BoxDecoration(color: backgroundColor),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_selectedFile != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0, left: 4),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            // color: surfaceColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: brightness == Brightness.dark
-                                  ? Colors.white24
-                                  : kblack00004,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.insert_drive_file,
-                                // color: Colors.white,
-                                size: 32,
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0,
-                                ),
-                                child: Text(
-                                  _selectedFile!.extension?.toUpperCase() ??
-                                      "DOC",
-                                  style: const TextStyle(
-                                    // color: Colors.white70,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          top: -6,
-                          right: -6,
-                          child: GestureDetector(
-                            onTap: _removeFile,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                // color: Colors.grey,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 14,
-                                //  color: Colors.black,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                Container(
-                  decoration: BoxDecoration(
-                    // color: surfaceColor,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: _pickFile,
-                        icon: const Icon(
-                          Icons.add, //color: Colors.grey
-                        ),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          //style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            hintText: "Ask Gemini",
-                            // hintStyle: TextStyle(color: Colors.grey),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          onSubmitted: (_) => _sendMessage(),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: _isLoading ? null : _sendMessage,
-                        icon: _isLoading
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+          // Use ValueListenableBuilder to listen to the service state
+          ValueListenableBuilder<bool>(
+            valueListenable: _agentService.isAgentSpeaking,
+            builder: (context, isSpeaking, child) {
+              return
+              // 2. Input Area
+              Container(
+                padding: const EdgeInsets.all(16),
+                // decoration: BoxDecoration(color: backgroundColor),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_selectedFile != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0, left: 4),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                // color: surfaceColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
                                   color: brightness == Brightness.dark
-                                      ? kwhite25525525510
-                                      : kblack000010,
+                                      ? Colors.white24
+                                      : kblack00004,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.send, //color: Colors.white
                               ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.insert_drive_file,
+                                    // color: Colors.white,
+                                    size: 32,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4.0,
+                                    ),
+                                    child: Text(
+                                      _selectedFile!.extension?.toUpperCase() ??
+                                          "DOC",
+                                      style: const TextStyle(
+                                        // color: Colors.white70,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: GestureDetector(
+                                onTap: _removeFile,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    // color: Colors.grey,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    //  color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        // color: surfaceColor,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Row(
+                        children: [
+                          // MIC BUTTON (New)
+                          GestureDetector(
+                            // Hold to talk logic
+                            onLongPressStart: (_) => _startListening(),
+                            onLongPressEnd: (_) => _stopListening(),
+                            child: IconButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      // Click to toggle recording if user prefers click over hold
+                                      if (_isListening) {
+                                        _stopListening();
+                                      } else if (_textController.text.isEmpty) {
+                                        _startListening();
+                                      } else {
+                                        _sendMessage();
+                                      }
+                                    },
+                              icon: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Icon(
+                                      // If Agent is speaking, show a Volume/Wave icon
+                                      isSpeaking
+                                          ? Icons.graphic_eq
+                                          : (_isListening
+                                                ? Icons.mic
+                                                : (_textController.text.isEmpty
+                                                      ? Icons.mic_none
+                                                      : Icons.send)),
+
+                                      // Animate color when speaking
+                                      color: isSpeaking
+                                          ? Colors.greenAccent
+                                          : (_isListening
+                                                ? Colors.redAccent
+                                                : Colors.white),
+                                    ),
+                              // Icon(
+                              //     // Change icon based on state
+                              //     _isListening
+                              //         ? Icons.mic
+                              //         : (_textController.text.isEmpty
+                              //               ? Icons.mic_none
+                              //               : Icons.send),
+                              //     color: _isListening ? Colors.red : null,
+                              //   ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _pickFile,
+                            icon: const Icon(
+                              Icons.add, //color: Colors.grey
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _textController,
+                              //style: const TextStyle(color: Colors.white),
+                              decoration: const InputDecoration(
+                                hintText: "Ask Gemini",
+                                // hintStyle: TextStyle(color: Colors.grey),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _isLoading ? null : _sendMessage,
+                            icon: _isLoading
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: brightness == Brightness.dark
+                                          ? kwhite25525525510
+                                          : kblack000010,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send, //color: Colors.white
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
