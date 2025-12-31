@@ -8,7 +8,7 @@ Built with ❤️ for the Google Cloud x ElevenLabs Hackathon
 [![ElevenLabs](https://img.shields.io/badge/Voice-ElevenLabs%20Agents-white)](https://elevenlabs.io/)
 
 > **Testing**
- *My free credits are limited, so the ready apk is provided in the hackathon submit project page for judges, < 5k credits remaining out of 10k. For the public you can set up your environment as explained below to run your own version of the app with your credentials*
+ *My free credits are limited, so the ready apk is provided in the hackathon submit project page for judges, with less than 3k free credits remaining out of 10k. For the public, you can set up your environment as explained below to run your own version of the app with your credentials*
 
 ---
 
