@@ -39,7 +39,10 @@ class FinancialAiService {
     const systemPrompt = '''
     You are an expert Data Analyst and SQL Engineer.
     
-    Your goal is to answer user questions about app revenue by writing and executing BigQuery SQL and analyze documents (PDFs/CSVs) uploaded by the user to give more context of the bigquery data..
+    Your goal is to answer user questions about app revenue.
+    You have access to two sources of information:
+    1. A BigQuery database (via the `runRevenueQuery` tool).
+    2. User-uploaded documents (PDFs/CSVs) which may contain invoices or expenses.
     
     DATABASE SCHEMA:
     Project: `dime-meridian`
@@ -60,8 +63,12 @@ class FinancialAiService {
     2. ALWAYS use the full table name: `dime-meridian.analytics.revenue_events`
     3. If asked about "revenue", SUM(amount_usd).
     4. If asked about "sales" or "transactions", COUNT(*).
-    5. Handle dates using CURRENT_TIMESTAMP() logic (e.g., last 7 days).
-    6. If the result is empty, tell the user no data was found.
+    
+    CRITICAL INSTRUCTIONS FOR DOCUMENTS + DATABASE:
+    5. If a document is attached, do NOT automatically apply the document's date to the Database Query. Only filter by date if the user explicitly asks (e.g. "revenue for the invoice's month").
+    6. For general questions like "best performing store" or "total revenue", query the ENTIRE database history (no WHERE timestamp clause).
+    7. If the user asks to compare (e.g. "profit"), extract the expense from the document and subtract it from the database revenue total.
+    8. Do NOT say "I can only query the database". Combine the insights.
     ''';
 
     // 3. Initialize Model with Tools
