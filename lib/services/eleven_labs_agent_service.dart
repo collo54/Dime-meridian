@@ -16,14 +16,14 @@ class ElevenLabsAgentService {
   final Uuid _uuid = const Uuid();
   final ValueNotifier<bool> isAgentSpeaking = ValueNotifier(false);
 
-  // Buffer for Raw PCM Data
-  final List<int> _pcmBuffer = [];
+  // Queue system for playing chunks sequentially
+  final List<String> _fileQueue = [];
+  bool _isPlayingQueue = false;
 
   Timer? _hardTimeout;
   bool _sessionActive = false;
   bool _closing = false;
 
-  // ElevenLabs Agents usually stream at 16kHz (16000)
   static const int _sampleRate = 16000;
   static const Duration _maxSessionDuration = Duration(seconds: 30);
 
@@ -42,7 +42,8 @@ class ElevenLabsAgentService {
       debugPrint("🔌 Connecting...");
       _sessionActive = true;
       _closing = false;
-      _pcmBuffer.clear();
+      _fileQueue.clear();
+      _isPlayingQueue = false;
 
       _channel = WebSocketChannel.connect(Uri.parse(signedUrl));
 
@@ -54,12 +55,8 @@ class ElevenLabsAgentService {
         },
         onDone: () {
           debugPrint("🔌 WebSocket closed by server");
-          // If the server closes the connection (normal end of turn),
-          // play whatever audio we managed to buffer.
-          if (_pcmBuffer.isNotEmpty) {
-            _playBufferedAudio();
-          }
           _sessionActive = false;
+          // We don't disconnect here immediately to allow the queue to finish playing
         },
       );
 
@@ -68,19 +65,10 @@ class ElevenLabsAgentService {
         disconnect();
       });
 
-      // 1️⃣ Send Initiation (Required by Spec)
-      // We accept the default PCM stream.
-      _sendJson({
-        "type": "conversation_initiation_client_data",
-        // Optional: You can still set voice settings here if needed
-        // "conversation_config_override": { "tts": { "stability": 0.5 } }
-      });
+      _sendJson({"type": "conversation_initiation_client_data"});
 
-      // 2️⃣ Wait briefly for handshake
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // 3️⃣ Send Text Prompt
-      // The agent interprets "user_message" as speech to respond to.
       _sendJson({
         "type": "user_message",
         "text": "Summarize this data in 2 sentences: $contextText",
@@ -95,28 +83,25 @@ class ElevenLabsAgentService {
     if (_closing) return;
 
     final Map<String, dynamic> data = jsonDecode(message);
-
-    // The spec uses 'type' to identify messages
     final type = data['type'];
 
     switch (type) {
       case 'audio':
-        // Spec: "audio_event" contains "audio_base_64"
+        // ⚡️ CRITICAL CHANGE: Process audio IMMEDIATELY
         final chunk = data['audio_event']?['audio_base_64'];
         if (chunk != null) {
-          _pcmBuffer.addAll(base64Decode(chunk));
+          // Wrap this single chunk in a WAV header and queue it
+          await _processAndQueueAudioChunk(base64Decode(chunk));
         }
         break;
 
       case 'agent_response':
-        // Spec: "agent_response_event" contains "agent_response"
         debugPrint(
           "🤖 Agent Text: ${data['agent_response_event']?['agent_response']}",
         );
         break;
 
       case 'ping':
-        // Spec: Respond with 'pong' and 'event_id'
         _sendJson({
           "type": "pong",
           "event_id": data['ping_event']?['event_id'],
@@ -124,47 +109,74 @@ class ElevenLabsAgentService {
         break;
 
       case 'interruption':
-        // If we interrupted the agent, clear buffer
-        _pcmBuffer.clear();
+        _clearQueue(); // Stop playing if interrupted
         break;
     }
   }
 
-  Future<void> _playBufferedAudio() async {
-    if (_pcmBuffer.isEmpty) return;
+  // --- NEW: Queue System ---
 
+  Future<void> _processAndQueueAudioChunk(Uint8List pcmData) async {
     try {
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/agent_${_uuid.v4()}.wav');
+      final filePath = '${dir.path}/chunk_${_uuid.v4()}.wav';
+      final file = File(filePath);
 
-      // 1. Add WAV Header to Raw PCM
-      // This tricks Android into playing the raw data correctly
-      final wavBytes = _createWavHeader(_pcmBuffer.length, _sampleRate);
-      wavBytes.addAll(_pcmBuffer);
+      // Add WAV Header to this specific chunk
+      final wavBytes = _createWavHeader(pcmData.length, _sampleRate);
+      wavBytes.addAll(pcmData);
 
       await file.writeAsBytes(wavBytes, flush: true);
 
-      debugPrint("🎵 Playing generated WAV (${file.lengthSync()} bytes)...");
+      // Add to queue and trigger playback if not already running
+      _fileQueue.add(filePath);
 
-      // Notify UI: START
-      isAgentSpeaking.value = true;
-
-      await _player.play(DeviceFileSource(file.path));
-
-      // Wait for playback to finish
-      await _player.onPlayerComplete.first;
+      if (!_isPlayingQueue) {
+        _playQueue();
+      }
     } catch (e) {
-      debugPrint("❌ Audio Playback Error: $e");
-    } finally {
-      // Notify UI: STOP (Even if error occurs)
-      isAgentSpeaking.value = false;
+      debugPrint("Error queuing chunk: $e");
     }
   }
 
-  /// Creates a standard WAV header for 16-bit Mono PCM audio
+  Future<void> _playQueue() async {
+    if (_fileQueue.isEmpty) {
+      _isPlayingQueue = false;
+      isAgentSpeaking.value = false;
+      return;
+    }
+
+    _isPlayingQueue = true;
+    isAgentSpeaking.value = true;
+
+    final filePath = _fileQueue.removeAt(0);
+
+    try {
+      await _player.play(DeviceFileSource(filePath));
+      await _player.onPlayerComplete.first; // Wait for this chunk to finish
+
+      // Delete temp file to save space
+      File(filePath).delete().ignore();
+    } catch (e) {
+      debugPrint("Error playing chunk: $e");
+    }
+
+    // Play next chunk
+    _playQueue();
+  }
+
+  void _clearQueue() {
+    _fileQueue.clear();
+    _player.stop();
+    _isPlayingQueue = false;
+    isAgentSpeaking.value = false;
+  }
+
+  // --- Helpers ---
+
   List<int> _createWavHeader(int pcmLength, int sampleRate) {
     int channels = 1;
-    int byteRate = sampleRate * channels * 2; // 16-bit = 2 bytes
+    int byteRate = sampleRate * channels * 2;
     int totalDataLen = pcmLength + 36;
 
     var header = Uint8List(44);
@@ -175,12 +187,12 @@ class ElevenLabsAgentService {
     _writeString(view, 8, 'WAVE');
     _writeString(view, 12, 'fmt ');
     view.setUint32(16, 16, Endian.little);
-    view.setUint16(20, 1, Endian.little); // PCM
+    view.setUint16(20, 1, Endian.little);
     view.setUint16(22, channels, Endian.little);
     view.setUint32(24, sampleRate, Endian.little);
     view.setUint32(28, byteRate, Endian.little);
     view.setUint16(32, channels * 2, Endian.little);
-    view.setUint16(34, 16, Endian.little); // 16-bit
+    view.setUint16(34, 16, Endian.little);
     _writeString(view, 36, 'data');
     view.setUint32(40, pcmLength, Endian.little);
 
@@ -200,11 +212,14 @@ class ElevenLabsAgentService {
 
   void disconnect() {
     if (_closing) return;
-    isAgentSpeaking.value = false; // Reset UI
     _closing = true;
     _hardTimeout?.cancel();
     _channel?.sink.close();
-    _player.stop();
+
+    // Allow queue to finish playing before stopping?
+    // No, disconnect usually means "Force Stop".
+    _clearQueue();
+
     _sessionActive = false;
     debugPrint("🛑 Agent Disconnected.");
   }
